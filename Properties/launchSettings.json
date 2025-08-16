@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BmsSpy": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
