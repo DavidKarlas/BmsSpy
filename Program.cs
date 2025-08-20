@@ -33,8 +33,13 @@ while (true)
 
         var connectWithServer = new TcpClient();
         connectWithServer.Connect(IPAddress.Parse("47.88.9.64"), 9090);
+        Console.WriteLine("Connected to backed server!");
 
         var upstreamStream = connectWithServer.GetStream();
+
+        var failure = false;
+        stream.ReadTimeout = 2 * 60 * 1000; // 2 minutes
+        upstreamStream.ReadTimeout = 2 * 60 * 1000; // 2 minutes
 
         var serverToClientTask = Task.Run(() => {
             var srvBuf = new byte[4 * 1024];
@@ -47,20 +52,25 @@ while (true)
                     stream.Write(srvBuf, 0, srvRead);
                 }
             }
-            catch
+            catch (Exception e)
             {
-                // Ignore exceptions during teardown/half-closes
+                Console.WriteLine($"Error in Upstream -> Client loop: {e}");
+                failure = true;
             }
         });
 
         try
         {
             // Client -> Upstream server
-            while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) != 0)
+            while (!failure && (bytesRead = stream.Read(buffer, 0, buffer.Length)) != 0)
             {
                 ProcessPacket(buffer.Take(bytesRead).ToArray());
                 upstreamStream.Write(buffer, 0, bytesRead);
             }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Error in Client -> Upstream loop: {e}");
         }
         finally
         {
@@ -73,7 +83,7 @@ while (true)
     }
     catch (Exception ex)
     {
-        Console.WriteLine(ex.ToString());
+        Console.WriteLine($"Error in main loop: {ex}");
     }
 }
 
@@ -81,20 +91,24 @@ void ProcessPacket(byte[] packetBytes)
 {
     if (packetBytes[4] != 0xb)
         return;
-    var timestamp = DateTime.UtcNow;
+#if DEBUGGING
     Console.Clear();
+#endif
     var data = packetBytes.Skip(4).SkipLast(1).ToArray();
 
     for (int moduleIndex = 0; moduleIndex < 5; moduleIndex++)
     {
         var start = moduleIndex * 79 + 11;
-        PrintModuleData(timestamp, data.Skip(start).Take(79).ToArray());
+        PrintModuleData(data.Skip(start).Take(79).ToArray());
+#if DEBUGGING
         Console.WriteLine();
+#endif
     }
 }
 
-void PrintModuleData(DateTime timestamp, byte[] arr)
+void PrintModuleData(byte[] arr)
 {
+#if DEBUGGING
     Console.WriteLine($"Id:{arr[3]}");
     Console.WriteLine($"Voltage: {BitConverter.ToUInt16(arr, 4) / 10.0}");
     Console.WriteLine($"Amps: {BitConverter.ToInt16(arr, 6) / 100.0} Total in(Ah): {BitConverter.ToUInt32(arr, 8) / 100.0} Total out(Ah): {BitConverter.ToUInt32(arr, 12) / 100.0} Total Power(kWh): {BitConverter.ToUInt32(arr, 16) / 100.0} Total Output Power(kWh): {BitConverter.ToUInt32(arr, 20) / 100.0}");
@@ -108,6 +122,7 @@ void PrintModuleData(DateTime timestamp, byte[] arr)
     Console.WriteLine($"Max volt cell id: {arr[66]} Min volt cell id: {arr[67]}");
     Console.WriteLine($"All have 3: {arr[68]}");
     Console.WriteLine($"Max temp: {arr[69]} Min temp: {arr[70]} Temp 1: {arr[71]} Temp 2: {arr[72]} Temp 3: {arr[73]}");
+#endif
 
     // Build and push Influx Line Protocol
     try
