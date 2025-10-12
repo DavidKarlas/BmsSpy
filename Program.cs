@@ -117,11 +117,12 @@ void ProcessPacket(byte[] packetBytes)
 void PrintPackData(byte[] data)
 {
 #if DEBUGGING
-            Console.Clear();
-            Console.WriteLine($"Request charging voltage: {BitConverter.ToUInt16(data, 54) / 10.0}V");
-            Console.WriteLine($"Charge limit: {BitConverter.ToUInt16(data, 56) / 10.0}A");
-            Console.WriteLine($"Request discharging voltage: {BitConverter.ToUInt16(data, 58) / 10.0}V");
-            Console.WriteLine($"Discharge limit: {BitConverter.ToUInt16(data, 60) / 10.0}A");
+    Console.Clear();
+    Console.WriteLine($"SoC: {data[29]}%");
+    Console.WriteLine($"Request charging voltage: {BitConverter.ToUInt16(data, 54) / 10.0}V");
+    Console.WriteLine($"Charge limit: {BitConverter.ToUInt16(data, 56) / 10.0}A");
+    Console.WriteLine($"Request discharging voltage: {BitConverter.ToUInt16(data, 58) / 10.0}V");
+    Console.WriteLine($"Discharge limit: {BitConverter.ToUInt16(data, 60) / 10.0}A");
 #else
     try
     {
@@ -129,6 +130,7 @@ void PrintPackData(byte[] data)
         double chargeLimitAmps = BitConverter.ToUInt16(data, 56) / 10.0;
         double requestDischargingVoltage = BitConverter.ToUInt16(data, 58) / 10.0;
         double dischargeLimitAmps = BitConverter.ToUInt16(data, 60) / 10.0;
+        int soc = data[29];
 
         var sb = new StringBuilder();
         sb.Append("bms ");
@@ -136,6 +138,7 @@ void PrintPackData(byte[] data)
         sb.Append(",charge_limit_amps=").Append(chargeLimitAmps.ToString("0.###", CultureInfo.InvariantCulture));
         sb.Append(",request_discharging_voltage=").Append(requestDischargingVoltage.ToString("0.###", CultureInfo.InvariantCulture));
         sb.Append(",discharge_limit_amps=").Append(dischargeLimitAmps.ToString("0.###", CultureInfo.InvariantCulture));
+        sb.Append(",soc=").Append(soc.ToString(CultureInfo.InvariantCulture));
 
         var line = sb.ToString();
         var content = new StringContent(line, Encoding.UTF8, "text/plain");
