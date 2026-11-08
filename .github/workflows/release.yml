@@ -36,6 +36,23 @@ jobs:
             --api-versions monitoring.coreos.com/v1/ServiceMonitor \
             --api-versions monitoring.coreos.com/v1/PrometheusRule > /dev/null
 
+      - name: Check dashboard
+        # The dashboard must use its "datasource" variable, never a fixed data source, so it works in
+        # any Grafana, both via the chart's sidecar ConfigMap and via manual import. A dashboard
+        # exported from a live Grafana embeds that instance's data source UIDs; this catches them.
+        run: |
+          f=charts/bmsspy/dashboards/bmsspy.json
+          if jq -e 'has("__inputs")' "$f" > /dev/null; then
+            echo "::error file=$f::exported with 'sharing externally' on; export again with it off"
+            exit 1
+          fi
+          bad=$(jq -c '[.. | objects | select(has("datasource")) | .datasource
+                        | select(type != "object" or .uid != "${datasource}")] | unique' "$f")
+          if [ "$bad" != "[]" ]; then
+            echo "::error file=$f::fixed data sources found (use the datasource variable): $bad"
+            exit 1
+          fi
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3

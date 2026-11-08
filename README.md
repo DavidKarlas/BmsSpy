@@ -52,6 +52,33 @@ docker run -d --name bmsspy -p 8080:8080 -e BMS_HOST=<address of the BMS Wi-Fi m
 | `IDLE_TIMEOUT_SECONDS` | `120` | Reconnect after this long without frames |
 | `VERBOSE` | – | `1` logs every received frame |
 
+## Grafana dashboard
+
+[`charts/bmsspy/dashboards/bmsspy.json`](charts/bmsspy/dashboards/bmsspy.json) shows:
+
+- power and state of charge
+- cell voltages, for all modules and for one selected module
+- temperatures
+- current, with the limits the BMS requests from the inverter
+- energy charged and discharged, per time range and per day
+- charge/discharge permissions
+
+To install it:
+
+- **Helm:** installed automatically (see above).
+- **Any other Grafana:** download the file, then go to Dashboards → New → Import and upload it. Pick
+  your Prometheus data source in the *Data source* dropdown at the top. Tested with Grafana 12.
+
+To change the dashboard:
+
+1. Edit it in Grafana.
+2. Export it as JSON. Leave "Export for sharing externally" ("Export the dashboard to use in another
+   instance" in newer versions) **off**.
+3. Replace the file.
+
+The dashboard has to keep using its `datasource` variable instead of a fixed data source, so it works
+in any Grafana. CI rejects a file that embeds one.
+
 ## Metrics
 
 Telemetry series disappear if the BMS sends nothing for 60 s, so outages show up as gaps rather than
