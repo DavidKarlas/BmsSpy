@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bmsspy.fullname" . }}
+  labels:
+    {{- include "bmsspy.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "bmsspy.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP

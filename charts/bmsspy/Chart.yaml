@@ -1,0 +1,10 @@
+apiVersion: v2
+name: bmsspy
+description: Replaces a battery BMS's manufacturer cloud server and exports its telemetry to Prometheus
+type: application
+# Overwritten from the git tag by the release workflow.
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/DavidKarlas/BmsSpy
+sources:
+  - https://github.com/DavidKarlas/BmsSpy

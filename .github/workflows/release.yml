@@ -1,0 +1,75 @@
+# Builds the container image on every push and pull request.
+# - push to main: image tagged "main" and "sha-<commit>"
+# - tag vX.Y.Z:   image tagged "X.Y.Z" plus the Helm chart X.Y.Z (appVersion X.Y.Z)
+# Both are published to ghcr.io under the repository owner.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Registry paths
+        # ghcr.io needs lowercase names; the owner may contain capitals.
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE=ghcr.io/$owner/bmsspy" >> "$GITHUB_ENV"
+          echo "CHART_REPO=oci://ghcr.io/$owner/charts" >> "$GITHUB_ENV"
+
+      - uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: |
+          helm lint charts/bmsspy --set bms.host=192.0.2.10
+          helm template bmsspy charts/bmsspy --set bms.host=192.0.2.10 --set prometheusRule.enabled=true \
+            --api-versions monitoring.coreos.com/v1/ServiceMonitor \
+            --api-versions monitoring.coreos.com/v1/PrometheusRule > /dev/null
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=sha
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish chart
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+          helm package charts/bmsspy --version "$version" --app-version "$version"
+          helm push "bmsspy-$version.tgz" "$CHART_REPO"

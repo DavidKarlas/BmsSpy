@@ -1,0 +1,12 @@
+BmsSpy connects to the BMS at {{ .Values.bms.host }}:{{ .Values.bms.port }}.
+
+Check the session:
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "bmsspy.fullname" . }}
+  (expect "connected" followed by "login from device ...")
+
+Metrics: http://{{ include "bmsspy.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.metrics.port }}/metrics
+{{- if not (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor") }}
+
+No Prometheus Operator CRDs found, so no ServiceMonitor was created. Configure scraping of the
+Service above yourself.
+{{- end }}

@@ -1,0 +1,60 @@
+{{- if and .Values.prometheusRule.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PrometheusRule") }}
+{{- $sel := include "bmsspy.promSelector" . }}
+{{- $r := .Values.prometheusRule }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "bmsspy.fullname" . }}
+  labels:
+    {{- include "bmsspy.labels" . | nindent 4 }}
+    {{- with $r.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: bmsspy
+      rules:
+        - alert: BmsSpyDown
+          expr: up{ {{- $sel -}} } == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: BmsSpy is not being scraped
+            description: Prometheus cannot scrape BmsSpy in {{ "{{ $labels.namespace }}" }}.
+        - alert: BmsNoData
+          expr: bms_connected{ {{- $sel -}} } == 0 or (time() - bms_last_frame_timestamp_seconds{ {{- $sel -}} }) > 120
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: No data from the BMS
+            description: BmsSpy has no working session with the BMS. Check that the BMS Wi-Fi module is reachable and in TCP-server mode.
+        - alert: BmsModuleMissing
+          expr: bms_modules{ {{- $sel -}} } < max_over_time(bms_modules{ {{- $sel -}} }[1d])
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: A battery module stopped reporting
+            description: The BMS reports {{ "{{ $value }}" }} modules, fewer than earlier today.
+        - alert: BmsCellVoltageSpreadHigh
+          expr: |
+            (bms_pack_cell_voltage_max_volts{ {{- $sel -}} } - bms_pack_cell_voltage_min_volts{ {{- $sel -}} }) > {{ $r.cellVoltageSpreadVolts }}
+            and on (namespace, job) bms_pack_state_of_charge_ratio{ {{- $sel -}} } >= 0.2
+            and on (namespace, job) bms_pack_state_of_charge_ratio{ {{- $sel -}} } <= 0.9
+          for: {{ $r.cellVoltageSpreadFor }}
+          labels:
+            severity: warning
+          annotations:
+            summary: Cells are out of balance
+            description: Highest and lowest cell differ by {{ "{{ $value | humanize }}" }}V in the middle of the charge range.
+        - alert: BmsTemperatureHigh
+          expr: bms_pack_temperature_max_celsius{ {{- $sel -}} } > {{ $r.maxTemperatureCelsius }}
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Battery temperature is high
+            description: Highest battery temperature is {{ "{{ $value }}" }}°C.
+{{- end }}

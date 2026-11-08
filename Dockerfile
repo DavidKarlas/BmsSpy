@@ -4,10 +4,16 @@
 FROM mcr.microsoft.com/dotnet/runtime:9.0 AS base
 USER $APP_UID
 WORKDIR /app
+# The diagnostics IPC socket would need a writable /tmp; disabling it lets the container run
+# with a read-only root filesystem.
+ENV DOTNET_EnableDiagnostics=0
+# Prometheus metrics and health endpoint
+EXPOSE 8080
 
 
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+# This stage is used to build the service project. It runs on the build machine's own platform:
+# the output is architecture-neutral IL, so multi-arch images need no emulation.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["BmsSpy.csproj", "."]

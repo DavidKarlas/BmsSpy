@@ -1,0 +1,58 @@
+bms:
+  # Address (IP or hostname) of the BMS Wi-Fi module, running in TCP-server mode. Required.
+  host: ""
+  port: 9090
+
+image:
+  repository: ghcr.io/davidkarlas/bmsspy
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Reconnect when the BMS sends nothing for this long (it normally sends every ~10 s).
+idleTimeoutSeconds: 120
+# Log every received frame.
+verbose: false
+
+metrics:
+  port: 8080
+
+serviceMonitor:
+  # Rendered only when the Prometheus Operator CRDs exist in the cluster.
+  enabled: true
+  # The BMS reports every ~10 s; scraping slower throws data away.
+  interval: 10s
+  labels: {}
+
+grafanaDashboard:
+  # ConfigMap for the Grafana dashboard sidecar (grafana and kube-prometheus-stack charts).
+  enabled: true
+  # Defaults to the release namespace. Point it at Grafana's namespace if the sidecar only
+  # watches its own namespace (the grafana chart's default).
+  namespace: ""
+  labels:
+    grafana_dashboard: "1"
+  annotations: {}
+
+prometheusRule:
+  # Alerting rules. Rendered only when the Prometheus Operator CRDs exist in the cluster.
+  enabled: false
+  labels: {}
+  # LFP cell voltages diverge near full and empty, so the spread alert only looks at the flat
+  # middle of the charge curve and needs the spread to persist.
+  cellVoltageSpreadVolts: 0.2
+  cellVoltageSpreadFor: 30m
+  maxTemperatureCelsius: 50
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 48Mi
+  limits:
+    memory: 128Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
